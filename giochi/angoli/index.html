@@ -1,1 +1,394 @@
 
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gioco degli Angoli – Livelli</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --shadow:0 6px 24px rgba(0,0,0,.1); --blue:#2f6fed; }
+  body { font-family: Arial, sans-serif; background:var(--bg); margin:0; color:#111; }
+  .wrap { max-width: 980px; margin:auto; padding:20px; }
+  .card { background:var(--card); border-radius:16px; padding:18px; box-shadow:var(--shadow); }
+  .top { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; }
+  h2 { margin:0 0 8px; }
+  .help { flex: 1 1 420px; background:#f2f4ff; border:1px solid #e2e6ff; border-radius:14px; padding:12px 14px; }
+  .help p { margin:6px 0; }
+  .pill { display:inline-block; background:#fff; border:1px solid #dde3ff; padding:2px 10px; border-radius:999px; font-weight:700; }
+  .levels { display:flex; gap:8px; flex-wrap:wrap; }
+  button { padding:10px 12px; border:0; border-radius:10px; font-size:16px; cursor:pointer; margin:4px 4px 0 0; }
+  .levelBtn { background:#e9ecf7; color:#111; font-weight:700; }
+  .levelBtn.active { outline: 3px solid rgba(47,111,237,.35); }
+  .levelBtn[disabled] { opacity:.55; cursor:not-allowed; }
+  .answer { background:var(--blue); color:white; font-weight:700; }
+  .secondary { background:#ddd; color:#111; font-weight:700; }
+  .grid { display:grid; grid-template-columns: 1.3fr .7fr; gap:16px; margin-top:14px; }
+  @media (max-width: 860px){ .grid{ grid-template-columns:1fr; } }
+  canvas { width:100%; height:360px; border:2px solid #ddd; border-radius:12px; background:#fff; }
+  .stats { margin-top:10px; font-weight:bold; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .msg { margin-top:10px; font-size:18px; font-weight:800; }
+  .ok { color: #0a7a2f; }
+  .ko { color: #b00020; }
+  .small { font-size: 13px; color:#444; font-weight:600; margin-top:6px; }
+  .panel { background:#fff; border:1px solid #eee; border-radius:14px; padding:12px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  .panel h3 { margin:0 0 6px; font-size:16px; }
+  .divider { height:1px; background:#eee; margin:10px 0; }
+  .lock { font-size: 14px; margin-left:6px; }
+
+  /* Modal fine gioco */
+  .modalOverlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.45);
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal{
+    width:min(560px, 95vw);
+    background:#fff; border-radius:18px; padding:18px 18px 14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal h3{ margin:0 0 6px; font-size:20px; }
+  .modal p{ margin:6px 0; color:#222; font-weight:600; }
+  .modal .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="top">
+      <div>
+        <h2>🎯 Gioco degli Angoli</h2>
+        <div class="levels" aria-label="Selezione livelli">
+          <button id="lvl1Btn" class="levelBtn" onclick="setLevel(1)">🟢 Livello 1</button>
+          <button id="lvl2Btn" class="levelBtn" onclick="setLevel(2)">🟡 Livello 2 <span id="lock2" class="lock">🔒</span></button>
+          <button id="lvl3Btn" class="levelBtn" onclick="setLevel(3)">🔴 Livello 3 <span id="lock3" class="lock">🔒</span></button>
+        </div>
+        <div class="small" id="progressText"></div>
+      </div>
+
+      <div class="help">
+        <p><b>Come si gioca</b></p>
+        <p>1) Guarda l’angolo nel riquadro.</p>
+        <p>2) Premi il pulsante con la risposta giusta.</p>
+        <p>3) Fai punti per sbloccare il livello successivo.</p>
+        <p>
+          ✅ Per passare:
+          <span class="pill">Livello 1 → 5 giuste</span>
+          <span class="pill">Livello 2 → 8 giuste</span>
+          <span class="pill">Livello 3 → 10 giuste (fine gioco)</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <canvas id="c" width="900" height="450" aria-label="Angolo"></canvas>
+
+        <div class="stats">
+          Livello: <span id="lvl">1</span> |
+          Punti livello: <span id="score">0</span> |
+          Domanda: <span id="q">1</span>
+        </div>
+
+        <div id="msg" class="msg"></div>
+        <div class="small" id="afterHint"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Risposte</h3>
+        <div id="buttons"></div>
+
+        <div class="divider"></div>
+
+        <button class="secondary" onclick="newAngle()">➡️ Nuovo angolo</button>
+        <button class="secondary" onclick="resetGame()">🔄 Ricomincia</button>
+
+        <div class="divider"></div>
+
+        <div class="small">
+          <b>Suggerimenti:</b><br>
+          • <b>Acuto</b> = meno di 90°<br>
+          • <b>Retto</b> = 90°<br>
+          • <b>Ottuso</b> = più di 90° (ma meno di 180°)<br>
+          • <b>Giro</b> = 360°
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal fine gioco -->
+<div id="modalOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <h3 id="modalTitle">🎉 Complimenti!</h3>
+    <p id="modalText"></p>
+    <p>Vuoi giocare ancora?</p>
+    <div class="actions">
+      <button class="answer" onclick="playAgain()">✅ Sì, ricominciamo</button>
+      <button class="secondary" onclick="closeModal()">No, basta così</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- Config livelli ---
+  const TARGET = { 1: 5, 2: 8, 3: 10 }; // punti necessari per "superare"
+  let unlocked = { 1: true, 2: false, 3: false };
+
+  // --- Canvas ---
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  // --- Stato gioco ---
+  let level = 1;
+  let score = 0;      // punti del livello corrente
+  let q = 1;
+  let angle = 60;
+  let lockedAnswer = false;
+
+  // --- UI refs ---
+  const scoreEl = document.getElementById("score");
+  const qEl = document.getElementById("q");
+  const lvlEl = document.getElementById("lvl");
+  const msgEl = document.getElementById("msg");
+  const afterHintEl = document.getElementById("afterHint");
+  const progressText = document.getElementById("progressText");
+
+  const lvl1Btn = document.getElementById("lvl1Btn");
+  const lvl2Btn = document.getElementById("lvl2Btn");
+  const lvl3Btn = document.getElementById("lvl3Btn");
+  const lock2 = document.getElementById("lock2");
+  const lock3 = document.getElementById("lock3");
+
+  // Modal
+  const modalOverlay = document.getElementById("modalOverlay");
+  const modalText = document.getElementById("modalText");
+
+  function updateLevelButtons(){
+    lvl1Btn.disabled = !unlocked[1];
+    lvl2Btn.disabled = !unlocked[2];
+    lvl3Btn.disabled = !unlocked[3];
+    lock2.style.display = unlocked[2] ? "none" : "inline";
+    lock3.style.display = unlocked[3] ? "none" : "inline";
+
+    [lvl1Btn, lvl2Btn, lvl3Btn].forEach(b => b.classList.remove("active"));
+    if(level === 1) lvl1Btn.classList.add("active");
+    if(level === 2) lvl2Btn.classList.add("active");
+    if(level === 3) lvl3Btn.classList.add("active");
+  }
+
+  function setLevel(l){
+    if(!unlocked[l]) return; // bloccato con lucchetto
+    level = l;
+    score = 0;
+    q = 1;
+    lockedAnswer = false;
+    msgEl.textContent = "";
+    msgEl.className = "msg";
+    afterHintEl.textContent = "";
+
+    lvlEl.textContent = level;
+    scoreEl.textContent = score;
+    qEl.textContent = q;
+
+    updateLevelButtons();
+    renderButtons();
+    newAngle();
+    updateProgressText();
+  }
+
+  function resetGame(){
+    unlocked = { 1: true, 2: false, 3: false };
+    closeModal();
+    setLevel(1);
+  }
+
+  function updateProgressText(){
+    progressText.textContent = `Obiettivo livello ${level}: ${score}/${TARGET[level]} risposte corrette`;
+  }
+
+  // --- Logica angoli ---
+  function newAngle(){
+    lockedAnswer = false;
+    msgEl.textContent = "";
+    msgEl.className = "msg";
+    afterHintEl.textContent = "";
+
+    if(level === 1){
+      // angoli "puliti"
+      angle = [30,60,90,120][Math.floor(Math.random()*4)];
+    } else if(level === 2){
+      // più vari, include (raramente) giro
+      angle = Math.floor(Math.random()*170)+10;
+      if(Math.random()<0.12) angle = 360;
+    } else {
+      // livello 3: ragiono rispetto a 90°
+      angle = Math.floor(Math.random()*170)+10;
+      // ogni tanto un retto preciso per non farlo sparire
+      if(Math.random()<0.12) angle = 90;
+    }
+
+    drawAngle(angle);
+  }
+
+  function classifyType(deg){
+    if(deg === 360) return "giro";
+    if(deg < 90) return "acuto";
+    if(deg === 90) return "retto";
+    return "ottuso";
+  }
+
+  function classifyCompare(deg){
+    if(deg < 90) return "minore";
+    if(deg === 90) return "uguale";
+    return "maggiore";
+  }
+
+  // --- Risposta ---
+  function answer(choice){
+    if(lockedAnswer) return;
+    lockedAnswer = true;
+
+    const correct = (level < 3) ? classifyType(angle) : classifyCompare(angle);
+
+    if(choice === correct){
+      score++;
+      msgEl.textContent = "✅ Bravo!";
+      msgEl.className = "msg ok";
+    } else {
+      msgEl.textContent = "❌ Riprova!";
+      msgEl.className = "msg ko";
+    }
+
+    // Mostro i gradi dopo la risposta (utile nel livello 2-3)
+    afterHintEl.textContent = `L’angolo era: ${angle}°`;
+
+    scoreEl.textContent = score;
+    updateProgressText();
+
+    // Sblocco / avanzamento
+    if(score >= TARGET[level]){
+      if(level === 1){
+        unlocked[2] = true;
+        updateLevelButtons();
+        showSmallCongrats("Hai superato il Livello 1! Ora puoi aprire il Livello 2 🟡");
+      } else if(level === 2){
+        unlocked[3] = true;
+        updateLevelButtons();
+        showSmallCongrats("Hai superato il Livello 2! Ora puoi aprire il Livello 3 🔴");
+      } else {
+        // fine gioco
+        showEndModal();
+      }
+    }
+  }
+
+  function showSmallCongrats(text){
+    // breve messaggio in pagina (non modal)
+    msgEl.textContent = "🎉 " + text;
+    msgEl.className = "msg ok";
+  }
+
+  // --- Modal fine gioco ---
+  function showEndModal(){
+    modalText.textContent = `Hai completato anche il Livello 3! Sei arrivato a ${TARGET[3]} risposte corrette. Bravissimo!`;
+    modalOverlay.style.display = "flex";
+  }
+  function closeModal(){
+    modalOverlay.style.display = "none";
+  }
+  function playAgain(){
+    resetGame();
+  }
+
+  // --- Disegno ---
+  function drawAngle(deg){
+    // Canvas hiDPI responsive
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(360 * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+
+    const w = rect.width;
+    const h = 360;
+    ctx.clearRect(0,0,w,h);
+
+    // sfondo
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,w,h);
+
+    const ox = w * 0.50;
+    const oy = h * 0.72;
+    const r  = Math.min(w, h) * 0.32;
+
+    // linea base
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#111";
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + r, oy);
+    ctx.stroke();
+
+    // semiretta ruotata
+    const rad = deg * Math.PI / 180;
+    const x2 = ox + r * Math.cos(-rad);
+    const y2 = oy + r * Math.sin(-rad);
+
+    ctx.strokeStyle = "#111";
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // arco
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#2f6fed";
+    ctx.beginPath();
+    const end = -rad;
+    ctx.arc(ox, oy, r * 0.55, 0, end, end > 0);
+    ctx.stroke();
+
+    // punto origine
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.arc(ox, oy, 7, 0, Math.PI*2);
+    ctx.fill();
+
+    // testo domanda
+    ctx.fillStyle = "#111";
+    ctx.font = "800 18px Arial";
+    ctx.fillText("Che angolo è?", 16, 28);
+  }
+
+  // --- Bottoni risposte ---
+  function renderButtons(){
+    const container = document.getElementById("buttons");
+    container.innerHTML = "";
+
+    let opts = [];
+    if(level === 1){
+      opts = ["acuto","retto","ottuso"];
+    } else if(level === 2){
+      opts = ["acuto","retto","ottuso","giro"];
+    } else {
+      opts = ["minore","uguale","maggiore"];
+    }
+
+    opts.forEach(o => {
+      const btn = document.createElement("button");
+      btn.textContent = o.toUpperCase();
+      btn.className = "answer";
+      btn.onclick = () => answer(o);
+      container.appendChild(btn);
+    });
+  }
+
+  window.addEventListener("resize", () => drawAngle(angle));
+
+  // Avvio
+  updateLevelButtons();
+  setLevel(1);
+</script>
+</body>
+</html>
