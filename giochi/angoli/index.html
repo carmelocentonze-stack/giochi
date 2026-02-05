@@ -1,40 +1,50 @@
-
 <!doctype html>
 <html lang="it">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gioco degli Angoli – Livelli</title>
+<title>Gioco degli Angoli – 4 livelli</title>
 <style>
   :root { --bg:#f6f7fb; --card:#fff; --shadow:0 6px 24px rgba(0,0,0,.1); --blue:#2f6fed; }
   body { font-family: Arial, sans-serif; background:var(--bg); margin:0; color:#111; }
-  .wrap { max-width: 980px; margin:auto; padding:20px; }
+  .wrap { max-width: 1020px; margin:auto; padding:20px; }
   .card { background:var(--card); border-radius:16px; padding:18px; box-shadow:var(--shadow); }
   .top { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; }
   h2 { margin:0 0 8px; }
-  .help { flex: 1 1 420px; background:#f2f4ff; border:1px solid #e2e6ff; border-radius:14px; padding:12px 14px; }
+  .help { flex: 1 1 480px; background:#f2f4ff; border:1px solid #e2e6ff; border-radius:14px; padding:12px 14px; }
   .help p { margin:6px 0; }
-  .pill { display:inline-block; background:#fff; border:1px solid #dde3ff; padding:2px 10px; border-radius:999px; font-weight:700; }
+  .pill { display:inline-block; background:#fff; border:1px solid #dde3ff; padding:2px 10px; border-radius:999px; font-weight:700; margin:2px 6px 2px 0; }
   .levels { display:flex; gap:8px; flex-wrap:wrap; }
   button { padding:10px 12px; border:0; border-radius:10px; font-size:16px; cursor:pointer; margin:4px 4px 0 0; }
   .levelBtn { background:#e9ecf7; color:#111; font-weight:700; }
   .levelBtn.active { outline: 3px solid rgba(47,111,237,.35); }
   .levelBtn[disabled] { opacity:.55; cursor:not-allowed; }
-  .answer { background:var(--blue); color:white; font-weight:700; }
-  .secondary { background:#ddd; color:#111; font-weight:700; }
+  .answer { background:var(--blue); color:white; font-weight:800; }
+  .secondary { background:#ddd; color:#111; font-weight:800; }
   .grid { display:grid; grid-template-columns: 1.3fr .7fr; gap:16px; margin-top:14px; }
   @media (max-width: 860px){ .grid{ grid-template-columns:1fr; } }
-  canvas { width:100%; height:360px; border:2px solid #ddd; border-radius:12px; background:#fff; }
+  canvas { width:100%; height:380px; border:2px solid #ddd; border-radius:12px; background:#fff; touch-action:none; }
+  .canvasWrap{ position:relative; }
+  #feedbackEmoji{
+    position:absolute; top:10px; right:14px;
+    font-size:44px; line-height:1;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,.15));
+    display:none;
+    user-select:none;
+  }
+
   .stats { margin-top:10px; font-weight:bold; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .msg { margin-top:10px; font-size:18px; font-weight:800; }
+  .msg { margin-top:10px; font-size:18px; font-weight:900; }
   .ok { color: #0a7a2f; }
   .ko { color: #b00020; }
-  .small { font-size: 13px; color:#444; font-weight:600; margin-top:6px; }
+  .small { font-size: 13px; color:#444; font-weight:650; margin-top:6px; }
   .panel { background:#fff; border:1px solid #eee; border-radius:14px; padding:12px; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
   .panel h3 { margin:0 0 6px; font-size:16px; }
   .divider { height:1px; background:#eee; margin:10px 0; }
   .lock { font-size: 14px; margin-left:6px; }
-
+  .badge { display:inline-block; padding:4px 10px; border-radius:999px; background:#111; color:#fff; font-weight:900; font-size:13px; }
+  .inputRow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input[type="number"]{ padding:10px 12px; border-radius:10px; border:1px solid #cfd3e3; font-size:16px; width:140px; }
   /* Modal fine gioco */
   .modalOverlay{
     position:fixed; inset:0; background:rgba(0,0,0,.45);
@@ -46,7 +56,7 @@
     box-shadow:0 20px 60px rgba(0,0,0,.25);
   }
   .modal h3{ margin:0 0 6px; font-size:20px; }
-  .modal p{ margin:6px 0; color:#222; font-weight:600; }
+  .modal p{ margin:6px 0; color:#222; font-weight:650; }
   .modal .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
 </style>
 </head>
@@ -61,32 +71,39 @@
           <button id="lvl1Btn" class="levelBtn" onclick="setLevel(1)">🟢 Livello 1</button>
           <button id="lvl2Btn" class="levelBtn" onclick="setLevel(2)">🟡 Livello 2 <span id="lock2" class="lock">🔒</span></button>
           <button id="lvl3Btn" class="levelBtn" onclick="setLevel(3)">🔴 Livello 3 <span id="lock3" class="lock">🔒</span></button>
+          <button id="lvl4Btn" class="levelBtn" onclick="setLevel(4)">🟣 Livello 4 <span id="lock4" class="lock">🔒</span></button>
         </div>
         <div class="small" id="progressText"></div>
       </div>
 
       <div class="help">
         <p><b>Come si gioca</b></p>
-        <p>1) Guarda l’angolo nel riquadro.</p>
-        <p>2) Premi il pulsante con la risposta giusta.</p>
-        <p>3) Fai punti per sbloccare il livello successivo.</p>
+        <p><span class="pill">L1</span> Indovina: acuto / retto / ottuso.</p>
+        <p><span class="pill">L2</span> Indovina anche il giro (360°).</p>
+        <p><span class="pill">L3</span> <b>Costruisci</b> l’angolo: trascina la semiretta per farlo diventare acuto/retto/ottuso.</p>
+        <p><span class="pill">L4</span> <b>Misura</b>: angolo con goniometro sullo sfondo → scrivi i gradi.</p>
         <p>
-          ✅ Per passare:
-          <span class="pill">Livello 1 → 5 giuste</span>
-          <span class="pill">Livello 2 → 8 giuste</span>
-          <span class="pill">Livello 3 → 10 giuste (fine gioco)</span>
+          ✅ Per sbloccare:
+          <span class="pill">L1 → 5 giuste</span>
+          <span class="pill">L2 → 8 giuste</span>
+          <span class="pill">L3 → 5 sfide superate</span>
+          <span class="pill">L4 → 5 misure corrette (fine)</span>
         </p>
       </div>
     </div>
 
     <div class="grid">
       <div>
-        <canvas id="c" width="900" height="450" aria-label="Angolo"></canvas>
+        <div class="canvasWrap">
+  <span id="feedbackEmoji" aria-hidden="true"></span>
+  <canvas id="c" width="900" height="450" aria-label="Angolo"></canvas>
+</div>
 
         <div class="stats">
           Livello: <span id="lvl">1</span> |
           Punti livello: <span id="score">0</span> |
-          Domanda: <span id="q">1</span>
+          Domanda: <span id="q">1</span> |
+          <span id="targetBadge" class="badge" style="display:none"></span>
         </div>
 
         <div id="msg" class="msg"></div>
@@ -94,17 +111,17 @@
       </div>
 
       <div class="panel">
-        <h3>Risposte</h3>
+        <h3>Azioni</h3>
         <div id="buttons"></div>
 
         <div class="divider"></div>
 
-        <button class="secondary" onclick="newAngle()">➡️ Nuovo angolo</button>
+        <button class="secondary" onclick="nextChallenge()">➡️ Nuovo</button>
         <button class="secondary" onclick="resetGame()">🔄 Ricomincia</button>
 
         <div class="divider"></div>
 
-        <div class="small">
+        <div class="small" id="sideHints">
           <b>Suggerimenti:</b><br>
           • <b>Acuto</b> = meno di 90°<br>
           • <b>Retto</b> = 90°<br>
@@ -131,8 +148,8 @@
 
 <script>
   // --- Config livelli ---
-  const TARGET = { 1: 5, 2: 8, 3: 10 }; // punti necessari per "superare"
-  let unlocked = { 1: true, 2: false, 3: false };
+  const TARGET = { 1: 5, 2: 8, 3: 5, 4: 5 };
+  let unlocked = { 1: true, 2: false, 3: false, 4: false };
 
   // --- Canvas ---
   const canvas = document.getElementById("c");
@@ -140,10 +157,19 @@
 
   // --- Stato gioco ---
   let level = 1;
-  let score = 0;      // punti del livello corrente
+  let score = 0;
   let q = 1;
   let angle = 60;
   let lockedAnswer = false;
+
+  // L3 (costruisci)
+  const buildTargets = ["acuto","retto","ottuso"];
+  let currentBuildTarget = "acuto";
+  let isDragging = false;
+
+  // L4 (misura)
+  let measureAnswerDeg = 60;
+  let measureTolerance = 5;
 
   // --- UI refs ---
   const scoreEl = document.getElementById("score");
@@ -152,36 +178,61 @@
   const msgEl = document.getElementById("msg");
   const afterHintEl = document.getElementById("afterHint");
   const progressText = document.getElementById("progressText");
+  const targetBadge = document.getElementById("targetBadge");
 
   const lvl1Btn = document.getElementById("lvl1Btn");
   const lvl2Btn = document.getElementById("lvl2Btn");
   const lvl3Btn = document.getElementById("lvl3Btn");
+  const lvl4Btn = document.getElementById("lvl4Btn");
+
   const lock2 = document.getElementById("lock2");
   const lock3 = document.getElementById("lock3");
+  const lock4 = document.getElementById("lock4");
 
   // Modal
   const modalOverlay = document.getElementById("modalOverlay");
   const modalText = document.getElementById("modalText");
 
+  // Feedback emoji (in alto a destra sul canvas)
+  const feedbackEmojiEl = document.getElementById("feedbackEmoji");
+  function setFeedbackEmoji(ok){
+    if(!feedbackEmojiEl) return;
+    feedbackEmojiEl.textContent = ok ? "😄" : "😕";
+    feedbackEmojiEl.style.display = "block";
+  }
+  function clearFeedbackEmoji(){
+    if(!feedbackEmojiEl) return;
+    feedbackEmojiEl.style.display = "none";
+    feedbackEmojiEl.textContent = "";
+  }
+
+
   function updateLevelButtons(){
     lvl1Btn.disabled = !unlocked[1];
     lvl2Btn.disabled = !unlocked[2];
     lvl3Btn.disabled = !unlocked[3];
+    lvl4Btn.disabled = !unlocked[4];
+
     lock2.style.display = unlocked[2] ? "none" : "inline";
     lock3.style.display = unlocked[3] ? "none" : "inline";
+    lock4.style.display = unlocked[4] ? "none" : "inline";
 
-    [lvl1Btn, lvl2Btn, lvl3Btn].forEach(b => b.classList.remove("active"));
+    [lvl1Btn, lvl2Btn, lvl3Btn, lvl4Btn].forEach(b => b.classList.remove("active"));
     if(level === 1) lvl1Btn.classList.add("active");
     if(level === 2) lvl2Btn.classList.add("active");
     if(level === 3) lvl3Btn.classList.add("active");
+    if(level === 4) lvl4Btn.classList.add("active");
   }
 
   function setLevel(l){
-    if(!unlocked[l]) return; // bloccato con lucchetto
+    clearFeedbackEmoji();
+    if(!unlocked[l]) return;
     level = l;
     score = 0;
     q = 1;
     lockedAnswer = false;
+    isDragging = false;
+
     msgEl.textContent = "";
     msgEl.className = "msg";
     afterHintEl.textContent = "";
@@ -192,42 +243,59 @@
 
     updateLevelButtons();
     renderButtons();
-    newAngle();
+    nextChallenge();
     updateProgressText();
   }
 
   function resetGame(){
-    unlocked = { 1: true, 2: false, 3: false };
+    clearFeedbackEmoji();
+    unlocked = { 1: true, 2: false, 3: false, 4: false };
     closeModal();
     setLevel(1);
   }
 
   function updateProgressText(){
-    progressText.textContent = `Obiettivo livello ${level}: ${score}/${TARGET[level]} risposte corrette`;
+    const label = (level === 3) ? "sfide superate" : (level === 4) ? "misure corrette" : "risposte corrette";
+    progressText.textContent = `Obiettivo livello ${level}: ${score}/${TARGET[level]} ${label}`;
   }
 
-  // --- Logica angoli ---
-  function newAngle(){
+  function nextChallenge(){
+    clearFeedbackEmoji();
     lockedAnswer = false;
     msgEl.textContent = "";
     msgEl.className = "msg";
     afterHintEl.textContent = "";
+    targetBadge.style.display = "none";
+    isDragging = false;
+
+    qEl.textContent = q;
 
     if(level === 1){
-      // angoli "puliti"
       angle = [30,60,90,120][Math.floor(Math.random()*4)];
+      drawAngle(angle, { showProtractor:false });
     } else if(level === 2){
-      // più vari, include (raramente) giro
       angle = Math.floor(Math.random()*170)+10;
       if(Math.random()<0.12) angle = 360;
-    } else {
-      // livello 3: ragiono rispetto a 90°
-      angle = Math.floor(Math.random()*170)+10;
-      // ogni tanto un retto preciso per non farlo sparire
-      if(Math.random()<0.12) angle = 90;
+      drawAngle(angle, { showProtractor:false });
+    } else if(level === 3){
+      currentBuildTarget = buildTargets[Math.floor(Math.random()*buildTargets.length)];
+      angle = 50 + Math.floor(Math.random()*100);
+      targetBadge.textContent = "OBIETTIVO: " + currentBuildTarget.toUpperCase();
+      targetBadge.style.display = "inline-block";
+      drawAngle(angle, { showProtractor:false, showDragHint:true });
+      afterHintEl.textContent = `Il tuo angolo: ${Math.round(angle)}°`;
+    } else if(level === 4){
+      measureAnswerDeg = 10 + Math.floor(Math.random()*171); // 10..180
+      angle = measureAnswerDeg;
+      targetBadge.textContent = "SCRIVI I GRADI";
+      targetBadge.style.display = "inline-block";
+      drawAngle(angle, { showProtractor:true });
+      const inp = document.getElementById("degInput");
+      if(inp) inp.value = "";
     }
 
-    drawAngle(angle);
+    renderButtons();
+    updateProgressText();
   }
 
   function classifyType(deg){
@@ -237,89 +305,144 @@
     return "ottuso";
   }
 
-  function classifyCompare(deg){
-    if(deg < 90) return "minore";
-    if(deg === 90) return "uguale";
-    return "maggiore";
+  function isRightAngle(deg){
+    return Math.abs(deg - 90) <= 3;
   }
 
-  // --- Risposta ---
+  // L1-L2
   function answer(choice){
     if(lockedAnswer) return;
     lockedAnswer = true;
 
-    const correct = (level < 3) ? classifyType(angle) : classifyCompare(angle);
+    const correct = classifyType(angle);
 
     if(choice === correct){
+      setFeedbackEmoji(true);
       score++;
       msgEl.textContent = "✅ Bravo!";
       msgEl.className = "msg ok";
     } else {
+      setFeedbackEmoji(false);
       msgEl.textContent = "❌ Riprova!";
       msgEl.className = "msg ko";
     }
 
-    // Mostro i gradi dopo la risposta (utile nel livello 2-3)
     afterHintEl.textContent = `L’angolo era: ${angle}°`;
-
     scoreEl.textContent = score;
     updateProgressText();
+    checkUnlockOrFinish();
+  }
 
-    // Sblocco / avanzamento
-    if(score >= TARGET[level]){
-      if(level === 1){
-        unlocked[2] = true;
-        updateLevelButtons();
-        showSmallCongrats("Hai superato il Livello 1! Ora puoi aprire il Livello 2 🟡");
-      } else if(level === 2){
-        unlocked[3] = true;
-        updateLevelButtons();
-        showSmallCongrats("Hai superato il Livello 2! Ora puoi aprire il Livello 3 🔴");
-      } else {
-        // fine gioco
-        showEndModal();
-      }
+  // L3
+  function checkBuild(){
+    let ok = false;
+    if(currentBuildTarget === "acuto") ok = angle < 90;
+    if(currentBuildTarget === "retto") ok = isRightAngle(angle);
+    if(currentBuildTarget === "ottuso") ok = angle > 90 && angle < 180;
+
+    if(ok){
+      setFeedbackEmoji(true);
+      score++;
+      msgEl.textContent = "✅ Perfetto! Hai costruito un angolo " + currentBuildTarget + ".";
+      msgEl.className = "msg ok";
+    } else {
+      setFeedbackEmoji(false);
+      msgEl.textContent = "❌ Non ancora. Trascina la semiretta e riprova!";
+      msgEl.className = "msg ko";
+    }
+    afterHintEl.textContent = `Il tuo angolo: ${Math.round(angle)}°`;
+    scoreEl.textContent = score;
+    updateProgressText();
+    checkUnlockOrFinish();
+  }
+
+  // L4
+  function checkMeasure(){
+    const inp = document.getElementById("degInput");
+    if(!inp) return;
+    const val = Number(inp.value);
+    if(!Number.isFinite(val)){
+      msgEl.textContent = "Scrivi un numero (in gradi) 🙂";
+      msgEl.className = "msg ko";
+      return;
+    }
+
+    const diff = Math.abs(val - measureAnswerDeg);
+    if(diff <= measureTolerance){
+      setFeedbackEmoji(true);
+      score++;
+      msgEl.textContent = "✅ Esatto!";
+      msgEl.className = "msg ok";
+    } else {
+      setFeedbackEmoji(false);
+      msgEl.textContent = "❌ Quasi!";
+      msgEl.className = "msg ko";
+    }
+    afterHintEl.textContent = `Risposta corretta: ${measureAnswerDeg}° (tu: ${val}°)`;
+    scoreEl.textContent = score;
+    updateProgressText();
+    checkUnlockOrFinish();
+  }
+
+  function checkUnlockOrFinish(){
+    if(score < TARGET[level]) return;
+
+    if(level === 1){
+      unlocked[2] = true;
+      updateLevelButtons();
+      showSmallCongrats("Hai superato il Livello 1! Ora puoi aprire il Livello 2 🟡");
+    } else if(level === 2){
+      unlocked[3] = true;
+      updateLevelButtons();
+      showSmallCongrats("Hai superato il Livello 2! Ora puoi aprire il Livello 3 🔴 (costruisci)");
+    } else if(level === 3){
+      unlocked[4] = true;
+      updateLevelButtons();
+      showSmallCongrats("Hai superato il Livello 3! Ora puoi aprire il Livello 4 🟣 (goniometro)");
+    } else if(level === 4){
+      showEndModal();
     }
   }
 
   function showSmallCongrats(text){
-    // breve messaggio in pagina (non modal)
     msgEl.textContent = "🎉 " + text;
     msgEl.className = "msg ok";
   }
 
-  // --- Modal fine gioco ---
+  // Modal fine gioco
   function showEndModal(){
-    modalText.textContent = `Hai completato anche il Livello 3! Sei arrivato a ${TARGET[3]} risposte corrette. Bravissimo!`;
+    modalText.textContent = `Hai completato anche il Livello 4! Hai fatto ${TARGET[4]} misure corrette. Bravissimo!`;
     modalOverlay.style.display = "flex";
   }
-  function closeModal(){
-    modalOverlay.style.display = "none";
-  }
-  function playAgain(){
-    resetGame();
-  }
+  function closeModal(){ modalOverlay.style.display = "none"; }
+  function playAgain(){ resetGame(); }
 
-  // --- Disegno ---
-  function drawAngle(deg){
-    // Canvas hiDPI responsive
+  // Disegno
+  function drawAngle(deg, opts){
+    opts = opts || {};
+    const showProtractor = !!opts.showProtractor;
+    const showDragHint = !!opts.showDragHint;
+
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(360 * dpr);
+    canvas.height = Math.floor(380 * dpr);
     ctx.setTransform(dpr,0,0,dpr,0,0);
 
     const w = rect.width;
-    const h = 360;
+    const h = 380;
     ctx.clearRect(0,0,w,h);
 
-    // sfondo
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0,0,w,h);
 
     const ox = w * 0.50;
-    const oy = h * 0.72;
-    const r  = Math.min(w, h) * 0.32;
+    const oy = h * 0.78;                     // leggermente più in basso
+    const r  = Math.min(w, h) * 0.36;        // un filo più grande per il livello 4
+
+    if(showProtractor){
+      drawProtractor5deg(ox, oy, r*1.45);    // goniometro più grande e leggibile
+    }
 
     // linea base
     ctx.lineWidth = 6;
@@ -345,8 +468,12 @@
     ctx.lineWidth = 10;
     ctx.strokeStyle = "#2f6fed";
     ctx.beginPath();
-    const end = -rad;
-    ctx.arc(ox, oy, r * 0.55, 0, end, end > 0);
+    if(deg === 360){
+      ctx.arc(ox, oy, r * 0.55, 0, Math.PI*2);
+    } else {
+      const end = -rad;
+      ctx.arc(ox, oy, r * 0.55, 0, end, end > 0);
+    }
     ctx.stroke();
 
     // punto origine
@@ -355,36 +482,182 @@
     ctx.arc(ox, oy, 7, 0, Math.PI*2);
     ctx.fill();
 
-    // testo domanda
+    // testo
     ctx.fillStyle = "#111";
-    ctx.font = "800 18px Arial";
-    ctx.fillText("Che angolo è?", 16, 28);
+    ctx.font = "900 18px Arial";
+    let title = "Che angolo è?";
+    if(level === 3) title = "Trascina la semiretta e costruisci l’angolo!";
+    if(level === 4) title = "Guarda il goniometro e misura l’angolo!";
+    ctx.fillText(title, 16, 28);
+
+    if(showDragHint){
+      ctx.fillStyle = "#444";
+      ctx.font = "700 14px Arial";
+      ctx.fillText("Suggerimento: clicca e trascina la semiretta per aprire/chiudere l’angolo.", 16, 50);
+    }
   }
 
-  // --- Bottoni risposte ---
+  // Goniometro semicircolare: tacche ogni 1°, numeri ogni 5° (5,10,15...)
+  // Per non affollare: i numeri a 10° sono più grandi e più esterni, quelli a 5° più piccoli e un po' più interni.
+  
+function drawProtractor5deg(ox, oy, radius){
+  ctx.save();
+  ctx.strokeStyle = "#cfd3e3";
+  ctx.lineWidth = 2;
+
+  // arco esterno (0° a destra, senso orario)
+  ctx.beginPath();
+  ctx.arc(ox, oy, radius, 0, Math.PI, true);
+  ctx.stroke();
+
+  // base
+  ctx.beginPath();
+  ctx.moveTo(ox-radius, oy);
+  ctx.lineTo(ox+radius, oy);
+  ctx.stroke();
+
+  // tacche e numeri: 0° → 180° in senso ORARIO
+  for(let deg=0; deg<=180; deg++){
+    const rad = deg * Math.PI/180;
+    const a = rad;
+
+    const is10 = (deg % 10 === 0);
+    const is5  = (deg % 5 === 0);
+
+    const len = is10 ? 20 : (is5 ? 14 : 8);
+
+    const x1 = ox + radius * Math.cos(a);
+    const y1 = oy - radius * Math.sin(a);
+    const x2 = ox + (radius - len) * Math.cos(a);
+    const y2 = oy - (radius - len) * Math.sin(a);
+
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+
+    if(is5){
+      ctx.fillStyle = "#7f88b5";
+      const fontSize = is10 ? 15 : 13;
+      ctx.font = `900 ${fontSize}px Arial`;
+
+      const textR = is10 ? (radius - 44) : (radius - 30);
+      const tx = ox + textR * Math.cos(a);
+      const ty = oy - textR * Math.sin(a);
+
+      ctx.fillText(String(deg), tx - (deg>=100?14:10), ty + 5);
+    }
+  }
+
+  ctx.restore();
+}
+
+
+  // Interazione L3
+  function canvasToAngle(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    const w = rect.width;
+    const h = 380;
+    const ox = w * 0.50;
+    const oy = h * 0.78;
+
+    const dx = x - ox;
+    const dy = y - oy;
+    let rad = Math.atan2(-dy, dx);
+    let deg = rad * 180/Math.PI;
+    if(deg < 0) deg = 0;
+    if(deg > 180) deg = 180;
+    deg = Math.max(5, Math.min(175, deg));
+    return deg;
+  }
+
+  function onPointerDown(e){
+    if(level !== 3) return;
+    isDragging = true;
+    angle = canvasToAngle(e.clientX, e.clientY);
+    drawAngle(angle, { showProtractor:false, showDragHint:true });
+    afterHintEl.textContent = `Il tuo angolo: ${Math.round(angle)}°`;
+  }
+  function onPointerMove(e){
+    if(level !== 3) return;
+    if(!isDragging) return;
+    angle = canvasToAngle(e.clientX, e.clientY);
+    drawAngle(angle, { showProtractor:false, showDragHint:true });
+    afterHintEl.textContent = `Il tuo angolo: ${Math.round(angle)}°`;
+  }
+  function onPointerUp(){
+    if(level !== 3) return;
+    isDragging = false;
+  }
+
+  canvas.addEventListener("pointerdown", (e)=>{ try{ canvas.setPointerCapture(e.pointerId); }catch(_){} onPointerDown(e); });
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerUp);
+
+  window.addEventListener("resize", () => {
+    if(level === 4) drawAngle(angle, { showProtractor:true });
+    else if(level === 3) drawAngle(angle, { showProtractor:false, showDragHint:true });
+    else drawAngle(angle, { showProtractor:false });
+  });
+
+  // Bottoni
   function renderButtons(){
     const container = document.getElementById("buttons");
     container.innerHTML = "";
 
-    let opts = [];
     if(level === 1){
-      opts = ["acuto","retto","ottuso"];
+      ["acuto","retto","ottuso"].forEach(o => addAnswerButton(container, o, ()=>answer(o)));
     } else if(level === 2){
-      opts = ["acuto","retto","ottuso","giro"];
-    } else {
-      opts = ["minore","uguale","maggiore"];
-    }
+      ["acuto","retto","ottuso","giro"].forEach(o => addAnswerButton(container, o, ()=>answer(o)));
+    } else if(level === 3){
+      const info = document.createElement("div");
+      info.className = "small";
+      info.innerHTML = "📌 Trascina la semiretta sul disegno. Quando pensi di aver fatto l’angolo richiesto, premi <b>VERIFICA</b>.";
+      container.appendChild(info);
 
-    opts.forEach(o => {
+      const verify = document.createElement("button");
+      verify.textContent = "✅ VERIFICA";
+      verify.className = "answer";
+      verify.onclick = checkBuild;
+      container.appendChild(verify);
+    } else if(level === 4){
+      const row = document.createElement("div");
+      row.className = "inputRow";
+
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.id = "degInput";
+      inp.min = "0";
+      inp.max = "180";
+      inp.placeholder = "Es. 120";
+      row.appendChild(inp);
+
       const btn = document.createElement("button");
-      btn.textContent = o.toUpperCase();
+      btn.textContent = "✅ CONTROLLA";
       btn.className = "answer";
-      btn.onclick = () => answer(o);
-      container.appendChild(btn);
-    });
+      btn.onclick = checkMeasure;
+      row.appendChild(btn);
+
+      container.appendChild(row);
+
+      const tip = document.createElement("div");
+      tip.className = "small";
+      tip.textContent = `Accettiamo una differenza di ±${measureTolerance}°. (Numeri sul goniometro ogni 5°)`;
+      container.appendChild(tip);
+    }
   }
 
-  window.addEventListener("resize", () => drawAngle(angle));
+  function addAnswerButton(container, label, fn){
+    const btn = document.createElement("button");
+    btn.textContent = label.toUpperCase();
+    btn.className = "answer";
+    btn.onclick = fn;
+    container.appendChild(btn);
+  }
 
   // Avvio
   updateLevelButtons();
