@@ -201,8 +201,16 @@
       overflow:hidden;
       border:1px solid rgba(0,0,0,.06);
       background:#fff;
+      width:100%;
     }
-    canvas{ width:100%; height:auto; display:block; background:#fff; touch-action:none; }
+    canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      background:#fff;
+      touch-action:none;
+      max-height:62vh; /* mobile: non troppo alto */
+    }
 
     /* Feedback + teoria (colonna destra) */
     .info{
@@ -280,7 +288,7 @@
     .theory .muted{ color:var(--muted); }
 
     .awardBox{
-      margin-top:12px;
+      width:100%;
       border-radius:14px;
       border:1px solid rgba(0,0,0,.06);
       background:#fff;
@@ -374,6 +382,43 @@
       .wrap{ display:none !important; }
       #certificatePrint{ display:block !important; }
     }
+
+    /* =========================
+       RESPONSIVE MOBILE FIX
+       ========================= */
+    @media (max-width: 820px){
+      body{ padding:12px; }
+      .panel{ padding:12px; }
+      .main{
+        grid-template-columns: 1fr !important;
+        gap:12px;
+      }
+      .menu{ order:1; }
+      .main > .panel:nth-child(2){ order:2; }
+      .main > .panel:nth-child(3){ order:3; }
+
+      .actionsUnder{
+        justify-content:flex-start;
+        gap:10px;
+      }
+      .actionsUnder .btn{
+        flex:1 1 48%;
+        min-width:140px;
+      }
+      .control{
+        min-width:unset;
+        flex:1 1 100%;
+      }
+      .titleRow h1{ font-size:16px; }
+      .creditTop{ font-size:11px; }
+      .subtitle{ font-size:12px; }
+    }
+    @media (max-width: 420px){
+      .actionsUnder .btn{
+        flex:1 1 100%;
+        min-width:unset;
+      }
+    }
   </style>
 </head>
 
@@ -404,7 +449,6 @@
           <canvas id="cv" width="980" height="620"></canvas>
         </div>
 
-        <!-- Barra bottoni: in premio finale resta solo griglie + stampa -->
         <div class="actionsUnder" id="toolbar">
           <button class="btn ghost" id="nextBtn">Vai al livello successivo →</button>
           <button class="btn secondary" id="helpBtn">AIUTO</button>
@@ -479,7 +523,6 @@
 <script>
 (() => {
   const DEV_UNLOCK_ALL = false;
-
   const POLY_NAMES = { 5:"Pentagono", 6:"Esagono", 7:"Ettagono", 8:"Ottagono", 9:"Ennagono", 10:"Decagono" };
 
   const canvas = document.getElementById('cv');
@@ -505,22 +548,58 @@
   const theoryTitle = document.getElementById('theoryTitle');
   const theoryBody  = document.getElementById('theoryBody');
 
-  /* Griglia */
+  /* =========================
+     RIPARTI DA ZERO AD OGNI APERTURA
+     (ma NON tocchiamo grid_cm)
+     ========================= */
+  const STORE_KEY = "poly_game_progress_final_v1";
+  localStorage.removeItem(STORE_KEY);
+
+  /* Griglia (FIX anti virgola "0,5") */
   const CM_TO_PX = 96 / 2.54;
-  let GRID_CM = parseFloat(localStorage.getItem("grid_cm") || "1");
+
+  let rawGrid = (localStorage.getItem("grid_cm") || "1").replace(",", ".");
+  let GRID_CM = Number(rawGrid);
+  if(!isFinite(GRID_CM) || GRID_CM <= 0) GRID_CM = 1;
+
   let GRID = GRID_CM * CM_TO_PX;
 
-  const TOL_CM = 0.35; // interna (non mostrata)
+  const TOL_CM = 0.35; // interna
   let TOL = TOL_CM * CM_TO_PX;
 
   function setGridCm(v){
     GRID_CM = v;
-    localStorage.setItem("grid_cm", String(v));
+    localStorage.setItem("grid_cm", String(v)); // salva con punto
     GRID = GRID_CM * CM_TO_PX;
     TOL = TOL_CM * CM_TO_PX;
     gridLabel.textContent = (GRID_CM === 1 ? "1 cm" : "0,5 cm");
   }
   setGridCm(GRID_CM);
+
+  /* =========================
+     CANVAS RESPONSIVE + DPR
+     ========================= */
+  function fitCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+
+    // usa la dimensione CSS reale
+    const cssW = Math.max(320, rect.width);
+    // altezza: proporzione simile a 980x620 (~0.63) ma non minuscola
+    const cssH = Math.max(360, Math.min(rect.height || cssW*0.63, window.innerHeight*0.62));
+
+    canvas.width  = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+
+    // disegna in coordinate CSS
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    render();
+  }
+
+  window.addEventListener('resize', () => {
+    clearTimeout(window.__fitT);
+    window.__fitT = setTimeout(fitCanvas, 120);
+  });
 
   const dist = (p,q) => Math.hypot(p.x-q.x, p.y-q.y);
   const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
@@ -565,13 +644,15 @@
     const rect = canvas.getBoundingClientRect();
     const x = (evt.clientX - rect.left) * (canvas.width / rect.width);
     const y = (evt.clientY - rect.top)  * (canvas.height / rect.height);
-    return {x,y};
+    // trasformazione DPR già gestita, qui lavoriamo in "px canvas",
+    // ma siccome setTransform disegna in coordinate CSS, usiamo rect->canvas
+    // (la scala è ok perché canvas.width/rect.width = dpr)
+    return {x, y};
   }
   function hitPoint(p, x, y){
     return Math.hypot(p.x-x, p.y-y) <= (p.r||12) + 10;
   }
 
-  /* Toolbar: nel premio finale SOLO griglie + stampa (come screenshot) */
   function applyBonusToolbar(isBonus){
     nextBtn.style.display  = isBonus ? "none" : "";
     helpBtn.style.display  = isBonus ? "none" : "";
@@ -584,14 +665,10 @@
     toolbar.style.justifyContent = isBonus ? "flex-start" : "space-between";
   }
 
-  /* Progressione */
-  const STORE_KEY = "poly_game_progress_final_v1";
-  const progress = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+  /* Progressione (riparte sempre da zero) */
+  const progress = {};
   function isCompleted(id){ return !!progress[id]; }
-  function markCompleted(id){
-    progress[id] = true;
-    localStorage.setItem(STORE_KEY, JSON.stringify(progress));
-  }
+  function markCompleted(id){ progress[id] = true; }
 
   const LEVELS = [
     { id:"tri_equil", label:"Triangolo equilatero", sub:"C libero + calamita", group:"1° livello — Triangoli" },
@@ -657,6 +734,13 @@
   let bonus = { sides: 7, radiusCm: 5, name: "" };
 
   function clearControls(){ controlsWrap.innerHTML = ""; }
+
+  function addHtmlControl(html){
+    const box = document.createElement('div');
+    box.className = 'awardBox';
+    box.innerHTML = html;
+    controlsWrap.appendChild(box);
+  }
 
   function addQuizButtons(title, options, onPick){
     const box = document.createElement('div');
@@ -756,6 +840,7 @@
   }
 
   function drawGrid(){
+    if(!isFinite(GRID) || GRID <= 0) return;
     ctx.save();
     for(let x=0; x<=canvas.width; x+=GRID){
       const major = Math.round(x/GRID) % 5 === 0;
@@ -951,6 +1036,58 @@
     applyBonusToolbar(mode === "bonus_free");
   }
 
+  function buildQuizUI(){
+    clearControls();
+
+    if(quiz.stage === "count"){
+      const opts = [quiz.n-1, quiz.n, quiz.n+1].filter(v => v>=3);
+      shuffle(opts);
+      addQuizButtons("Quanti lati ha questa figura?", opts, (v) => {
+        const diff = Math.abs(v - quiz.n);
+        if(diff === 0){
+          quiz.stage = "side";
+          setStatus("ok","Bravo! 🎉","Ora misura la base (in cm).");
+          startReveal();
+          buildQuizUI();
+        } else if(diff === 1){
+          setStatus("no","Ci sei quasi!","Sei vicinissimo: riconta i lati.");
+        } else {
+          setStatus("no","Conta bene!","Riconta lentamente i lati della figura.");
+        }
+      });
+      return;
+    }
+
+    if(quiz.stage === "side"){
+      const s = quiz.sideCm;
+      const opts = [Math.max(1,s-1), s, s+1];
+      shuffle(opts);
+      addQuizButtons("Quanto misura la base? (in cm)", opts, (v) => {
+        const diff = Math.abs(v - s);
+        if(diff === 0){
+          quiz.stage = "done";
+          lastOk = true;
+          stopReveal();
+          quiz.revealK = quiz.n;
+          setStatus("ok","Bravo! 🎉","Livello completato. Vai avanti!");
+
+          if(!isCompleted(mode)){
+            markCompleted(mode);
+            renderMenu();
+            updateNextButton();
+          }
+          clearControls();
+        } else if(diff === 1){
+          setStatus("no","Ci sei quasi!","Sei vicino: conta bene i quadretti.");
+        } else {
+          setStatus("no","Conta bene!","Conta i quadretti della base (è orizzontale).");
+        }
+        render();
+      });
+      return;
+    }
+  }
+
   function resetLevel(full){
     stopReveal();
     clearControls();
@@ -1050,74 +1187,22 @@
 
     if(mode === "bonus_free"){
       setStatus("neutral","🎁 Premio finale","Sei arrivato fin qui: ora crea poligoni come un vero geometra!");
-      setTheory("🎁 Premio finale",
-        `<div class="awardBox">
-           <h3>🏆 Complimenti!</h3>
-           <p>
-             Hai completato tutti i livelli! Ora puoi scegliere quanti lati vuoi e far apparire il poligono.
-             Prova numeri diversi e osserva come cambia la figura: sembra magia… ma è matematica!
-           </p>
-         </div>`
-      );
+      setTheory("🎁 Premio finale", `<p class="muted">Scegli quanti lati vuoi e guarda come cambia il poligono. Poi stampa il tuo attestato!</p>`);
 
       clearControls();
+      addHtmlControl(`
+        <h3>🏆 Complimenti!</h3>
+        <p>
+          Hai completato tutti i livelli! Ora puoi scegliere quanti lati vuoi e far apparire il poligono.
+          Prova numeri diversi e osserva come cambia la figura: sembra magia… ma è matematica!
+        </p>
+      `);
+
       addNumberControl("Quanti lati vuoi? (3–20)", 3, 20, bonus.sides, (v) => { bonus.sides = v; render(); });
       addNumberControl("Raggio (in cm) (2–10)", 2, 10, bonus.radiusCm, (v) => { bonus.radiusCm = v; render(); });
       addTextControl("Nome e cognome (per l’attestato)", "Es. Mario Rossi", bonus.name, (v) => { bonus.name = v; });
 
       render();
-      return;
-    }
-  }
-
-  function buildQuizUI(){
-    clearControls();
-
-    if(quiz.stage === "count"){
-      const opts = [quiz.n-1, quiz.n, quiz.n+1].filter(v => v>=3);
-      shuffle(opts);
-      addQuizButtons("Quanti lati ha questa figura?", opts, (v) => {
-        const diff = Math.abs(v - quiz.n);
-        if(diff === 0){
-          quiz.stage = "side";
-          setStatus("ok","Bravo! 🎉","Ora misura la base (in cm).");
-          startReveal();
-          buildQuizUI();
-        } else if(diff === 1){
-          setStatus("no","Ci sei quasi!","Sei vicinissimo: riconta i lati.");
-        } else {
-          setStatus("no","Conta bene!","Riconta lentamente i lati della figura.");
-        }
-      });
-      return;
-    }
-
-    if(quiz.stage === "side"){
-      const s = quiz.sideCm;
-      const opts = [Math.max(1,s-1), s, s+1];
-      shuffle(opts);
-      addQuizButtons("Quanto misura la base? (in cm)", opts, (v) => {
-        const diff = Math.abs(v - s);
-        if(diff === 0){
-          quiz.stage = "done";
-          lastOk = true;
-          stopReveal();
-          quiz.revealK = quiz.n;
-          setStatus("ok","Bravo! 🎉","Livello completato. Vai avanti!");
-
-          if(!isCompleted(mode)){
-            markCompleted(mode);
-            renderMenu();
-            updateNextButton();
-          }
-          clearControls();
-        } else if(diff === 1){
-          setStatus("no","Ci sei quasi!","Sei vicino: conta bene i quadretti.");
-        } else {
-          setStatus("no","Conta bene!","Conta i quadretti della base (è orizzontale).");
-        }
-        render();
-      });
       return;
     }
   }
@@ -1358,7 +1443,6 @@
   }
 
   let dragging=false;
-
   function isFreePointMode(){ return (mode === "tri_equil" || mode === "tri_right_talete"); }
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -1432,14 +1516,15 @@
 
   printBtn.addEventListener('click', () => printCertificate());
 
-  grid1Btn.addEventListener('click', () => { setGridCm(1); resetLevel(true); renderMenu(); updateNextButton(); applyBonusToolbar(mode==="bonus_free"); });
-  grid05Btn.addEventListener('click', () => { setGridCm(0.5); resetLevel(true); renderMenu(); updateNextButton(); applyBonusToolbar(mode==="bonus_free"); });
+  grid1Btn.addEventListener('click', () => { setGridCm(1); resetLevel(true); renderMenu(); updateNextButton(); applyBonusToolbar(mode==="bonus_free"); fitCanvas(); });
+  grid05Btn.addEventListener('click', () => { setGridCm(0.5); resetLevel(true); renderMenu(); updateNextButton(); applyBonusToolbar(mode==="bonus_free"); fitCanvas(); });
 
-  /* QUIZ UI helpers */
-
-  /* START */
+  /* Start */
   renderMenu();
   setMode(LEVELS[0].id);
+
+  // fit dopo il primo layout
+  setTimeout(fitCanvas, 0);
 })();
 </script>
 </body>
